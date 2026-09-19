@@ -1,10 +1,11 @@
-const CACHE='vl-sectors-v9-hotfix1';
+const CACHE='vl-sectors-v9-hotfix-dual-key';
 const APP=[
   './',
   './index.html',
   './styles.css',
   './app.js',
   './config.js',
+  './backup-key.js',
   './sectors.js',
   './manifest.webmanifest'
 ];

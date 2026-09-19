@@ -4,7 +4,14 @@
 
   const cfg = window.APP_CONFIG || {};
   const sectors = window.SECTORS || [];
-  const API_KEY = cfg.DGIS_KEY;
+  const PRIMARY_KEY = cfg.DGIS_KEY_PRIMARY || cfg.DGIS_KEY || '';
+  const BACKUP_KEY = window.DGIS_BACKUP_KEY || '';
+  const KEY_MODE = cfg.DGIS_KEY_MODE === 'backup' ? 'backup' : 'primary';
+
+  const API_KEY =
+    KEY_MODE === 'backup' && BACKUP_KEY && BACKUP_KEY !== 'PASTE_SECOND_2GIS_KEY_HERE'
+      ? BACKUP_KEY
+      : PRIMARY_KEY;
   const CITY = cfg.CITY_NAME || 'Владивосток';
   const CITY_CENTER = cfg.CITY_CENTER || [131.900, 43.132];
   const CITY_ZOOM = cfg.CITY_ZOOM || 10.85;
