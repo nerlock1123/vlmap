@@ -25,8 +25,16 @@
     zoom: CITY_ZOOM,
     zoomControl: 'bottomRight',
     enableTrackResize: true,
-    disableRotationByUserInteraction: true,
-    disablePitchByUserInteraction: true
+
+    // Native MapGL gestures:
+    // 1 finger = pan
+    // pinch = zoom
+    // 2 fingers = rotate / pitch
+    disableRotationByUserInteraction: false,
+    disablePitchByUserInteraction: false,
+
+    // Let MapGL choose the appropriate rendering complexity for the device.
+    graphicsPreset: 'auto'
   });
 
   let sectorObjects = [];

@@ -375,3 +375,70 @@ button { cursor:pointer; }
   .sheet-handle { display:block; }
   .toast { top:calc(116px + var(--safe-top)); }
 }
+
+
+/* =========================
+   v7 PERFORMANCE / GESTURES
+   ========================= */
+
+/*
+  MapGL is WebGL. On mobile, backdrop-filter forces the browser to repeatedly
+  blur pixels behind UI panels while the map is moving. That can cause visible
+  hitching during pan/zoom/rotation. Desktop keeps the richer glass effect;
+  touch/mobile gets cheaper opaque panels.
+*/
+@media (max-width: 760px), (pointer: coarse) {
+  .search-shell,
+  .quick-actions,
+  .info-sheet {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .search-shell,
+  .info-sheet {
+    background: rgba(255,255,255,.985) !important;
+  }
+
+  .quick-actions {
+    background: rgba(20,20,20,.97) !important;
+  }
+
+  .search-shell {
+    box-shadow: 0 4px 14px rgba(0,0,0,.13) !important;
+  }
+
+  .quick-actions {
+    box-shadow: 0 4px 14px rgba(0,0,0,.16) !important;
+  }
+
+  .info-sheet {
+    box-shadow: 0 -5px 20px rgba(0,0,0,.16) !important;
+  }
+
+  .legend-pill,
+  .sector-label,
+  .twogis-btn,
+  .toast {
+    box-shadow: none !important;
+  }
+
+  /*
+    Prevent browser text-selection/callout work while gesturing on map UI,
+    without disabling MapGL's own touch gestures.
+  */
+  .quick-actions,
+  .legend,
+  .sector-label {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* Reduce nonessential effects if the device/browser explicitly asks for it. */
+@media (prefers-reduced-motion: reduce) {
+  .twogis-btn:active,
+  button:active {
+    transform: none !important;
+  }
+}
