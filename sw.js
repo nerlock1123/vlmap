@@ -1,4 +1,4 @@
-const CACHE='vl-sectors-v9-hotfix-dual-key';
+const CACHE='vl-sectors-v9-hotfix-dual-key-poi-off';
 const APP=[
   './',
   './index.html',

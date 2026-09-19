@@ -78,7 +78,7 @@
 
   // v8 Smart POI layer.
   // Background POIs use Markers API, NOT Places API.
-  let poiVisible = true;
+  let poiVisible = false;
   let poiMarkers = [];
   let poiTimer = null;
   let poiAbort = null;
@@ -753,7 +753,10 @@
 
   renderLegend();
   renderSectors();
-  schedulePoiRefresh(900);
+
+  // Smart POI intentionally does NOT start automatically.
+  // The first Markers API request happens only after the user taps “Места”.
+  clearPoiMarkers();
 
   // PWA: safe enhancement; app still works without service worker.
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
