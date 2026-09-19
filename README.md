@@ -190,3 +190,29 @@ Service worker cache: `vl-sectors-v9-hotfix1`.
 - Первый запрос Markers API происходит только после явного нажатия `Места`.
 - Повторное нажатие удаляет POI-маркеры.
 - Поиск, клики по объектам, сектора, GPS, deeplink 2ГИС и dual-key не изменялись.
+
+
+## 3 ключа 2ГИС
+
+Файлы:
+- основной ключ — `config.js`
+- резерв №1 — `backup-key.js`
+- резерв №2 — `backup-key-2.js`
+
+Вставьте ключ №2 сюда:
+
+    window.DGIS_BACKUP_KEY_2 = 'ВАШ_КЛЮЧ';
+
+### Переключение
+
+В `config.js` меняется только:
+
+    DGIS_KEY_MODE: 'primary'
+
+Варианты:
+
+    DGIS_KEY_MODE: 'primary'  // основной
+    DGIS_KEY_MODE: 'backup1'  // резерв №1
+    DGIS_KEY_MODE: 'backup2'  // резерв №2
+
+После изменения сделайте commit/push и дождитесь нового деплоя.

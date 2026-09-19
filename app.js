@@ -5,13 +5,26 @@
   const cfg = window.APP_CONFIG || {};
   const sectors = window.SECTORS || [];
   const PRIMARY_KEY = cfg.DGIS_KEY_PRIMARY || cfg.DGIS_KEY || '';
-  const BACKUP_KEY = window.DGIS_BACKUP_KEY || '';
-  const KEY_MODE = cfg.DGIS_KEY_MODE === 'backup' ? 'backup' : 'primary';
+  const BACKUP_KEY_1 = window.DGIS_BACKUP_KEY_1 || '';
+  const BACKUP_KEY_2 = window.DGIS_BACKUP_KEY_2 || '';
 
-  const API_KEY =
-    KEY_MODE === 'backup' && BACKUP_KEY && BACKUP_KEY !== 'PASTE_SECOND_2GIS_KEY_HERE'
-      ? BACKUP_KEY
-      : PRIMARY_KEY;
+  const allowedKeyModes = new Set(['primary', 'backup1', 'backup2']);
+  const KEY_MODE = allowedKeyModes.has(cfg.DGIS_KEY_MODE)
+    ? cfg.DGIS_KEY_MODE
+    : 'primary';
+
+  const isUsableKey = (value) =>
+    value &&
+    !value.startsWith('PASTE_BACKUP_') &&
+    value !== 'PASTE_SECOND_2GIS_KEY_HERE';
+
+  let API_KEY = PRIMARY_KEY;
+
+  if (KEY_MODE === 'backup1' && isUsableKey(BACKUP_KEY_1)) {
+    API_KEY = BACKUP_KEY_1;
+  } else if (KEY_MODE === 'backup2' && isUsableKey(BACKUP_KEY_2)) {
+    API_KEY = BACKUP_KEY_2;
+  }
   const CITY = cfg.CITY_NAME || 'Владивосток';
   const CITY_CENTER = cfg.CITY_CENTER || [131.900, 43.132];
   const CITY_ZOOM = cfg.CITY_ZOOM || 10.85;

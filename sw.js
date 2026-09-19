@@ -1,4 +1,4 @@
-const CACHE='vl-sectors-v9-hotfix-dual-key-poi-off';
+const CACHE='vl-sectors-3keys-poi-off';
 const APP=[
   './',
   './index.html',
@@ -6,6 +6,7 @@ const APP=[
   './app.js',
   './config.js',
   './backup-key.js',
+  './backup-key-2.js',
   './sectors.js',
   './manifest.webmanifest'
 ];
