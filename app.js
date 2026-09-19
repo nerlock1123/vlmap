@@ -19,32 +19,47 @@
     return;
   }
 
-  const map = new mapgl.Map('map', {
+  let map;
+
+  const safeMapOptions = {
     key: API_KEY,
     center: CITY_CENTER,
     zoom: CITY_ZOOM,
     zoomControl: 'bottomRight',
     enableTrackResize: true,
-
-    // v9 tile-saving constraints:
-    // rotation stays available, but 3D pitch is disabled.
     disableRotationByUserInteraction: false,
     disablePitchByUserInteraction: true,
-
-    // Prevent accidental loading of very distant / extremely detailed tile sets.
-    minZoom: 10.2,
-    maxZoom: 18.0,
-
-    // Keep the map around Vladivostok + a safe buffer around all sectors.
-    // Format: [[west, south], [east, north]]
-    maxBounds: [
-      [131.78, 43.02],
-      [132.03, 43.23]
-    ],
-
-    // Let MapGL choose rendering complexity for the device.
     graphicsPreset: 'auto'
-  });
+  };
+
+  try {
+    map = new mapgl.Map('map', {
+      ...safeMapOptions,
+
+      // v9 HOTFIX:
+      // MapGL LngLatBounds must be an object with southWest / northEast.
+      minZoom: 10.2,
+      maxZoom: 18.0,
+      maxBounds: {
+        southWest: [131.78, 43.02],
+        northEast: [132.03, 43.23]
+      }
+    });
+  } catch (error) {
+    console.error('Optimized MapGL init failed, using safe fallback:', error);
+
+    // Never leave the user with a blank page because of an optional
+    // optimization. Fall back to the last known-good map configuration.
+    try {
+      map = new mapgl.Map('map', safeMapOptions);
+    } catch (fallbackError) {
+      console.error('MapGL fallback init failed:', fallbackError);
+      $('fatalError').classList.remove('hidden');
+      $('fatalMessage').textContent =
+        'Не удалось запустить карту 2ГИС. Обновите страницу или проверьте ключ/API.';
+      return;
+    }
+  }
 
   let sectorObjects = [];
   let sectorLabels = [];

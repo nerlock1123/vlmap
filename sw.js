@@ -1,4 +1,4 @@
-const CACHE='vl-sectors-v9';
+const CACHE='vl-sectors-v9-hotfix1';
 const APP=[
   './',
   './index.html',
