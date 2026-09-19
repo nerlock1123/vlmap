@@ -442,3 +442,122 @@ button { cursor:pointer; }
     transform: none !important;
   }
 }
+
+
+/* =========================
+   v10 LIVE LOCATION
+   ========================= */
+
+.action-btn:disabled {
+  opacity: .42;
+  cursor: default;
+}
+
+.live-location-marker {
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  position: relative;
+  pointer-events: none;
+}
+
+.live-location-marker::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(38, 112, 255, .24);
+  animation: live-location-pulse 1.8s ease-out infinite;
+}
+
+.live-location-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #2670ff;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 7px rgba(0,0,0,.38);
+}
+
+@keyframes live-location-pulse {
+  0% {
+    transform: scale(.58);
+    opacity: .85;
+  }
+  70% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+.live-status {
+  position: fixed;
+  z-index: 38;
+  top: calc(70px + var(--safe-top));
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100vw - 20px);
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  background: rgba(20,20,20,.92);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.11);
+  box-shadow: 0 5px 18px rgba(0,0,0,.16);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.live-status strong {
+  font-size: 12px;
+}
+
+.live-status-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: #2670ff;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px rgba(38,112,255,.25);
+}
+
+#liveAccuracyText,
+#liveSpeedText {
+  color: rgba(255,255,255,.72);
+}
+
+@media (max-width: 760px) {
+  .live-status {
+    top: calc(116px + var(--safe-top));
+    max-width: calc(100vw - 20px);
+    overflow: hidden;
+  }
+
+  .live-location-marker::before {
+    /* A static halo is cheaper on mobile than a continuous animation. */
+    animation: none;
+    transform: scale(1.15);
+    opacity: .35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-location-marker::before {
+    animation: none;
+    transform: scale(1.15);
+    opacity: .35;
+  }
+}

@@ -1,4 +1,4 @@
-const CACHE='vl-sectors-3keys-poi-off';
+const CACHE='vl-sectors-v10-live-location';
 const APP=[
   './',
   './index.html',

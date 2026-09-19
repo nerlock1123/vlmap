@@ -39,8 +39,11 @@
     </div>
 
     <div class="quick-actions">
-      <button id="locateBtn" class="action-btn" type="button" title="Моё местоположение">
-        <span class="action-icon">◎</span><span class="action-text">Я здесь</span>
+      <button id="locateBtn" class="action-btn" type="button" title="Включить постоянную геопозицию">
+        <span class="action-icon">◎</span><span class="action-text">GPS</span>
+      </button>
+      <button id="followBtn" class="action-btn" type="button" title="Следовать за моим местоположением" disabled>
+        <span class="action-icon">➤</span><span class="action-text">Следовать</span>
       </button>
       <button id="homeBtn" class="action-btn" type="button" title="Показать весь город">
         <span class="action-icon">⌂</span><span class="action-text">Весь город</span>
@@ -53,6 +56,13 @@
       </button>
     </div>
   </header>
+
+  <div id="liveLocationStatus" class="live-status hidden" aria-live="polite">
+    <span class="live-status-dot"></span>
+    <strong id="liveSectorText">GPS</strong>
+    <span id="liveAccuracyText"></span>
+    <span id="liveSpeedText"></span>
+  </div>
 
   <div id="legend" class="legend"></div>
 

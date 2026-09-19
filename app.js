@@ -89,6 +89,17 @@
   let searchTimer = null;
   let toastTimer = null;
 
+  // v10 live browser geolocation. No 2GIS Places/Markers requests are used here.
+  let geoWatchId = null;
+  let liveLocationMarker = null;
+  let liveLocationActive = false;
+  let followLocation = false;
+  let lastLiveCoords = null;
+  let lastCameraFollowAt = 0;
+  const FOLLOW_MIN_INTERVAL_MS = 1200;
+  const FOLLOW_EDGE_RATIO_X = 0.28;
+  const FOLLOW_EDGE_RATIO_Y = 0.30;
+
   // v8 Smart POI layer.
   // Background POIs use Markers API, NOT Places API.
   let poiVisible = false;
@@ -407,6 +418,172 @@
     return sectors.find((sector) => pointInPolygon(coords, sector.points)) || null;
   }
 
+
+  function liveMarkerHtml() {
+    return `
+      <div class="live-location-marker" aria-hidden="true">
+        <div class="live-location-core"></div>
+      </div>`;
+  }
+
+  function setLiveLocationMarker(coords) {
+    if (!liveLocationMarker) {
+      liveLocationMarker = new mapgl.HtmlMarker(map, {
+        coordinates: coords,
+        html: liveMarkerHtml(),
+        interactive: false,
+        preventMapInteractions: false,
+        zIndex: 250
+      });
+      return;
+    }
+
+    liveLocationMarker.setCoordinates(coords);
+  }
+
+  function removeLiveLocationMarker() {
+    if (!liveLocationMarker) return;
+    try { liveLocationMarker.destroy(); } catch (_) {}
+    liveLocationMarker = null;
+  }
+
+  function formatLiveSpeed(speedMps) {
+    if (!Number.isFinite(speedMps) || speedMps < 0.4) return '';
+    const kmh = Math.round(speedMps * 3.6);
+    return `${kmh} км/ч`;
+  }
+
+  function updateLiveStatus(position) {
+    const coords = [position.coords.longitude, position.coords.latitude];
+    const sector = findSector(coords);
+    const accuracy = Math.max(1, Math.round(position.coords.accuracy || 0));
+    const speed = formatLiveSpeed(position.coords.speed);
+
+    $('liveSectorText').textContent = sector
+      ? `Сектор ${sector.name}`
+      : 'Вне секторов';
+
+    $('liveAccuracyText').textContent = `±${accuracy} м`;
+    $('liveSpeedText').textContent = speed ? `• ${speed}` : '';
+    $('liveLocationStatus').classList.remove('hidden');
+  }
+
+  function shouldFollowCamera(coords) {
+    if (!followLocation) return false;
+
+    const now = Date.now();
+    if (now - lastCameraFollowAt < FOLLOW_MIN_INTERVAL_MS) return false;
+
+    try {
+      const pixel = map.project(coords);
+      const el = $('map');
+      const w = el.clientWidth || window.innerWidth;
+      const h = el.clientHeight || window.innerHeight;
+
+      if (!w || !h || !pixel) return true;
+
+      const minX = w * FOLLOW_EDGE_RATIO_X;
+      const maxX = w * (1 - FOLLOW_EDGE_RATIO_X);
+      const minY = h * FOLLOW_EDGE_RATIO_Y;
+      const maxY = h * (1 - FOLLOW_EDGE_RATIO_Y);
+
+      return pixel[0] < minX || pixel[0] > maxX || pixel[1] < minY || pixel[1] > maxY;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  function followCameraIfNeeded(coords, force = false) {
+    if (!followLocation) return;
+    if (!force && !shouldFollowCamera(coords)) return;
+
+    lastCameraFollowAt = Date.now();
+    map.setCenter(coords, {
+      animate: true,
+      duration: force ? 300 : 450
+    });
+
+    // Keep a useful navigation zoom without forcing a zoom change on every GPS update.
+    if (force && map.getZoom() < 15) {
+      map.setZoom(16, { animate: true, duration: 300 });
+    }
+  }
+
+  function handleLivePosition(position) {
+    const coords = [position.coords.longitude, position.coords.latitude];
+
+    if (!Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) return;
+
+    lastLiveCoords = coords;
+    setLiveLocationMarker(coords);
+    updateLiveStatus(position);
+    followCameraIfNeeded(coords, false);
+  }
+
+  function handleLiveLocationError(err) {
+    const messages = {
+      1: 'Доступ к геопозиции запрещён',
+      2: 'Не удалось определить геопозицию',
+      3: 'Истекло время определения геопозиции',
+    };
+    showToast(messages[err.code] || 'Ошибка геолокации');
+  }
+
+  function startLiveLocation() {
+    if (!navigator.geolocation) {
+      showToast('Геолокация не поддерживается этим браузером');
+      return;
+    }
+
+    if (liveLocationActive) return;
+
+    liveLocationActive = true;
+    $('locateBtn').classList.add('active');
+    $('followBtn').disabled = false;
+    showToast('GPS включён. Определяю местоположение…', 3500);
+
+    geoWatchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const firstFix = !lastLiveCoords;
+        handleLivePosition(position);
+
+        if (firstFix && lastLiveCoords) {
+          followLocation = true;
+          $('followBtn').classList.add('active');
+          followCameraIfNeeded(lastLiveCoords, true);
+          showToast(findSector(lastLiveCoords)
+            ? 'GPS включён — сектор определяется в реальном времени'
+            : 'GPS включён — вы вне заданных секторов');
+        }
+      },
+      handleLiveLocationError,
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 3000
+      }
+    );
+  }
+
+  function stopLiveLocation() {
+    if (geoWatchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(geoWatchId);
+    }
+
+    geoWatchId = null;
+    liveLocationActive = false;
+    followLocation = false;
+    lastLiveCoords = null;
+
+    $('locateBtn').classList.remove('active');
+    $('followBtn').classList.remove('active');
+    $('followBtn').disabled = true;
+    $('liveLocationStatus').classList.add('hidden');
+
+    removeLiveLocationMarker();
+    showToast('GPS выключен');
+  }
+
   function setMarker(coords) {
     if (selectionMarker) {
       try { selectionMarker.destroy(); } catch (_) {}
@@ -640,6 +817,8 @@
   });
 
   $('homeBtn').addEventListener('click', () => {
+    followLocation = false;
+    $('followBtn').classList.remove('active');
     map.setCenter(CITY_CENTER);
     map.setZoom(CITY_ZOOM);
     hideInfo();
@@ -668,40 +847,25 @@
   });
 
   $('locateBtn').addEventListener('click', () => {
-    if (!navigator.geolocation) {
-      showToast('Геолокация не поддерживается этим браузером');
-      return;
+    if (liveLocationActive) {
+      stopLiveLocation();
+    } else {
+      startLiveLocation();
     }
+  });
 
-    $('locateBtn').disabled = true;
-    showToast('Определяю местоположение…', 5000);
+  $('followBtn').addEventListener('click', () => {
+    if (!liveLocationActive || !lastLiveCoords) return;
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        $('locateBtn').disabled = false;
-        const coords = [pos.coords.longitude, pos.coords.latitude];
-        setMarker(coords);
-        map.setCenter(coords);
-        map.setZoom(16);
-        showInfo({
-          coords,
-          title: 'Моё местоположение',
-          address: `Точность ≈ ${Math.round(pos.coords.accuracy)} м`,
-          type: ''
-        });
-        showToast(findSector(coords) ? 'Сектор определён' : 'Вы находитесь вне заданных секторов');
-      },
-      (err) => {
-        $('locateBtn').disabled = false;
-        const messages = {
-          1: 'Доступ к геопозиции запрещён',
-          2: 'Не удалось определить геопозицию',
-          3: 'Истекло время определения геопозиции',
-        };
-        showToast(messages[err.code] || 'Ошибка геолокации');
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 }
-    );
+    followLocation = !followLocation;
+    $('followBtn').classList.toggle('active', followLocation);
+
+    if (followLocation) {
+      followCameraIfNeeded(lastLiveCoords, true);
+      showToast('Следование за GPS включено');
+    } else {
+      showToast('Карта свободна — GPS продолжает работать');
+    }
   });
 
   $('closeSheetBtn').addEventListener('click', hideInfo);
