@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Сектора VL" />
+  <title>Владивосток — сектора</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="config.js"></script>
+  <script src="sectors.js"></script>
+  <script src="https://mapgl.2gis.com/api/js/v1"></script>
+</head>
+<body>
+  <div id="map"></div>
+
+  <header class="top-ui">
+    <div class="search-shell">
+      <div class="search-row">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input
+          id="searchInput"
+          type="search"
+          inputmode="search"
+          autocomplete="off"
+          enterkeyhint="search"
+          placeholder="Адрес или место во Владивостоке"
+          aria-label="Поиск адреса или места"
+        />
+        <button id="clearSearchBtn" class="icon-btn hidden" type="button" aria-label="Очистить">×</button>
+      </div>
+      <div id="searchResults" class="search-results hidden"></div>
+    </div>
+
+    <div class="quick-actions">
+      <button id="locateBtn" class="action-btn" type="button" title="Моё местоположение">
+        <span class="action-icon">◎</span><span class="action-text">Я здесь</span>
+      </button>
+      <button id="homeBtn" class="action-btn" type="button" title="Показать весь город">
+        <span class="action-icon">⌂</span><span class="action-text">Весь город</span>
+      </button>
+      <button id="toggleSectorsBtn" class="action-btn active" type="button" title="Показать или скрыть сектора">
+        <span class="action-icon">▦</span><span class="action-text">Сектора</span>
+      </button>
+    </div>
+  </header>
+
+  <div id="legend" class="legend"></div>
+
+  <div id="statusToast" class="toast hidden" role="status"></div>
+
+  <section id="infoSheet" class="info-sheet hidden" aria-live="polite">
+    <button id="closeSheetBtn" class="sheet-close" type="button" aria-label="Закрыть">×</button>
+    <div class="sheet-handle"></div>
+    <div class="sheet-topline">
+      <span id="sectorBadge" class="sector-badge">—</span>
+      <span id="objectType" class="object-type"></span>
+    </div>
+    <h2 id="sheetTitle">Точка на карте</h2>
+    <p id="sheetAddress" class="sheet-address"></p>
+    <div class="sheet-meta">
+      <div>
+        <span class="meta-label">Сектор</span>
+        <strong id="sheetSector">—</strong>
+      </div>
+      <div>
+        <span class="meta-label">Координаты</span>
+        <strong id="sheetCoords">—</strong>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <a id="open2gisBtn" class="twogis-btn" href="https://2gis.ru/" target="_blank" rel="noopener">
+        <span class="twogis-mark">2ГИС</span>
+        <span>Открыть в приложении</span>
+        <span class="twogis-arrow">↗</span>
+      </a>
+    </div>
+  </section>
+
+  <div id="fatalError" class="fatal hidden">
+    <div class="fatal-card">
+      <h2>Карта не запустилась</h2>
+      <p id="fatalMessage">Проверьте доступ к API 2ГИС.</p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
