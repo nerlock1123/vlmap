@@ -2,4 +2,4 @@
 // Вставьте сюда второй ключ.
 // Этот файл можно менять отдельно от основной конфигурации.
 
-window.DGIS_BACKUP_KEY_1 = 'PASTE_BACKUP_1_2GIS_KEY_HERE';
+window.DGIS_BACKUP_KEY_1 = '69b639c1-a77a-49e4-9c04-5390b221dfbb';
