@@ -26,14 +26,23 @@
     zoomControl: 'bottomRight',
     enableTrackResize: true,
 
-    // Native MapGL gestures:
-    // 1 finger = pan
-    // pinch = zoom
-    // 2 fingers = rotate / pitch
+    // v9 tile-saving constraints:
+    // rotation stays available, but 3D pitch is disabled.
     disableRotationByUserInteraction: false,
-    disablePitchByUserInteraction: false,
+    disablePitchByUserInteraction: true,
 
-    // Let MapGL choose the appropriate rendering complexity for the device.
+    // Prevent accidental loading of very distant / extremely detailed tile sets.
+    minZoom: 10.2,
+    maxZoom: 18.0,
+
+    // Keep the map around Vladivostok + a safe buffer around all sectors.
+    // Format: [[west, south], [east, north]]
+    maxBounds: [
+      [131.78, 43.02],
+      [132.03, 43.23]
+    ],
+
+    // Let MapGL choose rendering complexity for the device.
     graphicsPreset: 'auto'
   });
 
@@ -44,6 +53,19 @@
   let searchAbort = null;
   let searchTimer = null;
   let toastTimer = null;
+
+  // v8 Smart POI layer.
+  // Background POIs use Markers API, NOT Places API.
+  let poiVisible = true;
+  let poiMarkers = [];
+  let poiTimer = null;
+  let poiAbort = null;
+  let lastPoiKey = '';
+  let markerApiRequestsThisSession = 0;
+  const MAX_MARKER_API_REQUESTS_PER_SESSION = 60;
+  const POI_CACHE_PREFIX = 'mapdozor-poi-v8:';
+  const POI_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+  const CITY_ID_CACHE_KEY = 'mapdozor-vladivostok-city-id-v8';
 
   function polygonRing(points) {
     return [[...points, points[0]]];
@@ -96,6 +118,226 @@
         zIndex: 21
       }));
     });
+  }
+
+
+  function clearPoiMarkers() {
+    destroyAll(poiMarkers);
+  }
+
+  function poiProfileForZoom(zoom) {
+    // No custom businesses at city overview: the map stays clean.
+    if (zoom < 13.3) return null;
+
+    if (zoom < 14.3) {
+      return { bucket: 'z13', radius: 1800, count: 8, cellLon: 0.020, cellLat: 0.014, labels: false };
+    }
+    if (zoom < 15.3) {
+      return { bucket: 'z14', radius: 1200, count: 14, cellLon: 0.012, cellLat: 0.008, labels: true };
+    }
+    if (zoom < 16.3) {
+      return { bucket: 'z15', radius: 800, count: 20, cellLon: 0.007, cellLat: 0.005, labels: true };
+    }
+    return { bucket: 'z16', radius: 500, count: 28, cellLon: 0.004, cellLat: 0.003, labels: true };
+  }
+
+  function snapToCell(value, size) {
+    return Math.round(value / size) * size;
+  }
+
+  function poiCacheKey(center, profile) {
+    const lon = snapToCell(center[0], profile.cellLon).toFixed(5);
+    const lat = snapToCell(center[1], profile.cellLat).toFixed(5);
+    return `${profile.bucket}:${lon}:${lat}`;
+  }
+
+  function readPoiCache(key) {
+    try {
+      const raw = sessionStorage.getItem(POI_CACHE_PREFIX + key);
+      if (!raw) return null;
+      const entry = JSON.parse(raw);
+      if (!entry?.ts || !Array.isArray(entry.items)) return null;
+      if (Date.now() - entry.ts > POI_CACHE_TTL) {
+        sessionStorage.removeItem(POI_CACHE_PREFIX + key);
+        return null;
+      }
+      return entry.items;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writePoiCache(key, items) {
+    try {
+      sessionStorage.setItem(
+        POI_CACHE_PREFIX + key,
+        JSON.stringify({ ts: Date.now(), items })
+      );
+    } catch (_) {}
+  }
+
+  function truncatePoiName(name, max = 24) {
+    const text = String(name || 'Организация').trim();
+    return text.length > max ? text.slice(0, max - 1) + '…' : text;
+  }
+
+  function renderPoiMarkers(items, profile) {
+    clearPoiMarkers();
+    if (!poiVisible || !profile) return;
+
+    items.slice(0, profile.count).forEach((item) => {
+      const lon = Number(item.lon);
+      const lat = Number(item.lat);
+      if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
+
+      const options = {
+        coordinates: [lon, lat],
+        zIndex: 35,
+      };
+
+      // Use native MapGL/WebGL labels rather than HTML markers.
+      // Labels appear only at closer zooms to avoid clutter.
+      if (profile.labels && item.name) {
+        options.label = {
+          text: truncatePoiName(item.name),
+          offset: [0, 22],
+          relativeAnchor: [0.5, 0],
+        };
+      }
+
+      const marker = new mapgl.Marker(map, options);
+      marker.on('click', () => {
+        const coords = [lon, lat];
+        setMarker(coords);
+        showInfo({
+          coords,
+          title: item.name || 'Организация',
+          address: 'Организация из слоя 2ГИС',
+          type: item.type || 'branch',
+          id: item.id
+        });
+      });
+
+      poiMarkers.push(marker);
+    });
+  }
+
+  async function getVladivostokCityId() {
+    try {
+      const cached = localStorage.getItem(CITY_ID_CACHE_KEY);
+      if (cached) return cached;
+    } catch (_) {}
+
+    if (markerApiRequestsThisSession >= MAX_MARKER_API_REQUESTS_PER_SESSION) {
+      return null;
+    }
+
+    const url = new URL('https://catalog.api.2gis.com/3.0/markers');
+    url.searchParams.set('q', CITY);
+    url.searchParams.set('type', 'adm_div.city');
+    url.searchParams.set('location', `${CITY_CENTER[0]},${CITY_CENTER[1]}`);
+    url.searchParams.set('page_size', '5');
+    url.searchParams.set('locale', 'ru_RU');
+    url.searchParams.set('fields', 'items.name');
+    url.searchParams.set('key', API_KEY);
+
+    markerApiRequestsThisSession += 1;
+    const data = await apiJson(url);
+    const items = data?.result?.items || [];
+    const city =
+      items.find((x) => String(x.name || '').toLowerCase().includes('владивосток')) ||
+      items[0];
+
+    if (!city?.id) return null;
+
+    const id = String(city.id).split('_')[0];
+    try { localStorage.setItem(CITY_ID_CACHE_KEY, id); } catch (_) {}
+    return id;
+  }
+
+  async function fetchNearbyPoi(center, profile, signal) {
+    if (markerApiRequestsThisSession >= MAX_MARKER_API_REQUESTS_PER_SESSION) {
+      return [];
+    }
+
+    const cityId = await getVladivostokCityId();
+    if (!cityId) return [];
+
+    const url = new URL('https://catalog.api.2gis.com/3.0/markers');
+
+    // Markers API supports search without a text query when the search
+    // is restricted to a city. We ask for nearby company branches.
+    url.searchParams.set('city_id', cityId);
+    url.searchParams.set('type', 'branch');
+    url.searchParams.set('point', `${center[0]},${center[1]}`);
+    url.searchParams.set('location', `${center[0]},${center[1]}`);
+    url.searchParams.set('radius', String(profile.radius));
+    url.searchParams.set('sort', 'rating');
+    url.searchParams.set('search_nearby', 'true');
+    url.searchParams.set('page_size', String(profile.count));
+    url.searchParams.set('locale', 'ru_RU');
+    url.searchParams.set('fields', 'items.name');
+    url.searchParams.set('key', API_KEY);
+
+    markerApiRequestsThisSession += 1;
+    const data = await apiJson(url, signal);
+    return (data?.result?.items || []).filter(
+      (item) => Number.isFinite(Number(item.lon)) && Number.isFinite(Number(item.lat))
+    );
+  }
+
+  async function refreshPoiLayer() {
+    if (!poiVisible) {
+      clearPoiMarkers();
+      return;
+    }
+
+    const zoom = map.getZoom();
+    const profile = poiProfileForZoom(zoom);
+
+    if (!profile) {
+      lastPoiKey = '';
+      clearPoiMarkers();
+      return;
+    }
+
+    const center = map.getCenter();
+    const key = poiCacheKey(center, profile);
+
+    // Same zoom/cell: no API request and no rerender.
+    if (key === lastPoiKey && poiMarkers.length) return;
+    lastPoiKey = key;
+
+    const cached = readPoiCache(key);
+    if (cached) {
+      renderPoiMarkers(cached, profile);
+      return;
+    }
+
+    if (markerApiRequestsThisSession >= MAX_MARKER_API_REQUESTS_PER_SESSION) {
+      // Hard guard against accidentally burning the demo quota during tests.
+      return;
+    }
+
+    if (poiAbort) poiAbort.abort();
+    poiAbort = new AbortController();
+
+    try {
+      const items = await fetchNearbyPoi(center, profile, poiAbort.signal);
+      writePoiCache(key, items);
+      renderPoiMarkers(items, profile);
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      console.warn('Smart POI layer unavailable:', err);
+
+      // Do not spam the API if this configuration is unavailable.
+      clearPoiMarkers();
+    }
+  }
+
+  function schedulePoiRefresh(delay = 450) {
+    clearTimeout(poiTimer);
+    poiTimer = setTimeout(refreshPoiLayer, delay);
   }
 
   // Boundary-aware point-on-segment check.
@@ -375,6 +617,21 @@
     renderSectors();
   });
 
+  $('togglePoiBtn').addEventListener('click', () => {
+    poiVisible = !poiVisible;
+    $('togglePoiBtn').classList.toggle('active', poiVisible);
+
+    if (!poiVisible) {
+      if (poiAbort) poiAbort.abort();
+      clearTimeout(poiTimer);
+      clearPoiMarkers();
+      return;
+    }
+
+    lastPoiKey = '';
+    schedulePoiRefresh(0);
+  });
+
   $('locateBtn').addEventListener('click', () => {
     if (!navigator.geolocation) {
       showToast('Геолокация не поддерживается этим браузером');
@@ -468,8 +725,13 @@
     }
   });
 
+  // Only refresh after MapGL is fully idle. No Places/Markers requests occur
+  // continuously during drag, pinch, rotation or pitch.
+  map.on('idle', () => schedulePoiRefresh(450));
+
   renderLegend();
   renderSectors();
+  schedulePoiRefresh(900);
 
   // PWA: safe enhancement; app still works without service worker.
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
