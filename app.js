@@ -4,6 +4,7 @@
 
   const cfg = window.APP_CONFIG || {};
   const branches = window.CYBERMG_BRANCHES || [];
+  const stops = window.AD_STOPS || [];
   const PRIMARY_KEY = cfg.DGIS_KEY_PRIMARY || cfg.DGIS_KEY || '';
   const BACKUP_KEY_1 = window.DGIS_BACKUP_KEY_1 || '';
   const BACKUP_KEY_2 = window.DGIS_BACKUP_KEY_2 || '';
@@ -82,6 +83,7 @@
   }
 
   let branchMarkers = [];
+  let stopMarkers = [];
   let selectionMarker = null;
   let searchAbort = null;
   let searchTimer = null;
@@ -142,10 +144,10 @@
       coordinates: branch.coordinates,
       text: `CYBERMG\n${branch.name}`,
       color: '#111111',
-      fontSize: 13,
+      fontSize: 11,
       lineHeight: 1.05,
       haloColor: '#FFC600',
-      haloRadius: 5,
+      haloRadius: 4,
       offset: [offsetX, offsetY],
       relativeAnchor,
       interactive: true,
@@ -183,10 +185,10 @@
     if (typeof mapgl.CircleMarker === 'function') {
       marker = new mapgl.CircleMarker(map, {
         coordinates: branch.coordinates,
-        diameter: 30,
+        diameter: 20,
         color: '#FFC600',
         strokeColor: '#111111',
-        strokeWidth: 4,
+        strokeWidth: 3,
         interactive: true,
         zIndex
       });
@@ -202,6 +204,108 @@
 
     marker.on('click', () => openBranch(branch));
     return marker;
+  }
+
+
+  function stopAvailabilityLabel(status) {
+    if (!status) return 'свободно';
+    if (status.occupied) {
+      return status.note ? `занято · ${status.note}` : 'занято';
+    }
+    return 'свободно';
+  }
+
+  function openStop(stop) {
+    showInfo({
+      coords: stop.coordinates,
+      title: `Остановка №${stop.id} · ${stop.name}`,
+      address: stop.address,
+      type: 'ad-stop',
+      stop
+    });
+  }
+
+  function createStopMarkerElement(stop) {
+    const el = document.createElement('div');
+    el.className = 'ad-stop-marker';
+    el.dataset.stopId = String(stop.id);
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label',
+      `Остановка №${stop.id}. Октябрь: ${stopAvailabilityLabel(stop.october)}. Декабрь: ${stopAvailabilityLabel(stop.december)}`
+    );
+    el.title = `№${stop.id} · ${stop.name}`;
+
+    const number = document.createElement('span');
+    number.className = 'ad-stop-number';
+    number.textContent = String(stop.id);
+
+    const statusRack = document.createElement('span');
+    statusRack.className = 'ad-stop-status-rack';
+
+    const octDot = document.createElement('span');
+    octDot.className = `ad-stop-status-dot ${stop.october?.occupied ? 'occupied' : 'free'}`;
+    octDot.title = `Октябрь: ${stopAvailabilityLabel(stop.october)}`;
+
+    const decDot = document.createElement('span');
+    decDot.className = `ad-stop-status-dot ${stop.december?.occupied ? 'occupied' : 'free'}`;
+    decDot.title = `Декабрь: ${stopAvailabilityLabel(stop.december)}`;
+
+    statusRack.append(octDot, decDot);
+    el.append(number, statusRack);
+
+    el.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openStop(stop);
+    });
+
+    return el;
+  }
+
+  function renderStops() {
+    destroyAll(stopMarkers);
+
+    if (!stops.length) {
+      console.warn('Advertising stop data were not loaded. Check stops.js.');
+      return;
+    }
+
+    stops.forEach((stop, index) => {
+      try {
+        const markerElement = createStopMarkerElement(stop);
+        const marker = new mapgl.HtmlMarker(map, {
+          coordinates: stop.coordinates,
+          html: markerElement,
+          anchor: [12, 12],
+          interactive: true,
+          preventMapInteractions: true,
+          labeling: { type: 'none' },
+          zIndex: 140 + index
+        });
+        stopMarkers.push(marker);
+      } catch (error) {
+        console.error(`Failed to render advertising stop #${stop.id}:`, error);
+
+        // Native fallback: the stop remains visible even if HTML markers are unavailable.
+        try {
+          const fallback = new mapgl.CircleMarker(map, {
+            coordinates: stop.coordinates,
+            diameter: 12,
+            color: '#FFFFFF',
+            strokeColor: '#111111',
+            strokeWidth: 2,
+            interactive: true,
+            zIndex: 140 + index
+          });
+          fallback.on('click', () => openStop(stop));
+          stopMarkers.push(fallback);
+        } catch (fallbackError) {
+          console.error(`Fallback stop marker failed for #${stop.id}:`, fallbackError);
+        }
+      }
+    });
+
+    console.info(`Stops: rendered ${stops.length} locations (${stopMarkers.length} map objects).`);
   }
 
   function renderBranches() {
@@ -681,6 +785,7 @@
       street: 'Улица',
       route: 'Маршрут',
       station: 'Остановка',
+      'ad-stop': 'Рекламный остановочный павильон',
     };
     return labels[type] || (type ? 'Объект 2ГИС' : 'Точка на карте');
   }
@@ -702,15 +807,35 @@
     return `https://2gis.ru/geo/${coords[0].toFixed(6)},${coords[1].toFixed(6)}`;
   }
 
-  function showInfo({ coords, title, address, type, id, branch = null }) {
+  function showInfo({ coords, title, address, type, id, branch = null, stop = null }) {
     const nearest = branch ? { branch, distance: 0 } : nearestBranch(coords);
     const badge = $('branchBadge');
 
-    badge.textContent = branch ? `CYBERMG · ${branch.name}` : 'CYBERMG';
-    badge.style.background = '#FFC600';
-    badge.style.color = '#111';
+    if (stop) {
+      badge.textContent = `ОСТАНОВКА №${stop.id}`;
+      badge.style.background = '#111111';
+      badge.style.color = '#FFFFFF';
+    } else {
+      badge.textContent = branch ? `CYBERMG · ${branch.name}` : 'CYBERMG';
+      badge.style.background = '#FFC600';
+      badge.style.color = '#111';
+    }
 
     $('objectType').textContent = branch ? 'Филиал CYBERMG' : typeLabel(type);
+
+    const stopAvailability = $('stopAvailability');
+    if (stop) {
+      const octOccupied = Boolean(stop.october?.occupied);
+      const decOccupied = Boolean(stop.december?.occupied);
+
+      $('octoberStatusDot').className = `availability-dot ${octOccupied ? 'occupied' : 'free'}`;
+      $('decemberStatusDot').className = `availability-dot ${decOccupied ? 'occupied' : 'free'}`;
+      $('octoberStatusText').textContent = stopAvailabilityLabel(stop.october);
+      $('decemberStatusText').textContent = stopAvailabilityLabel(stop.december);
+      stopAvailability.classList.remove('hidden');
+    } else {
+      stopAvailability.classList.add('hidden');
+    }
     $('sheetTitle').textContent = title || 'Точка на карте';
     $('sheetAddress').textContent = address || 'Без адреса';
     $('sheetBranch').textContent = nearest
@@ -1014,6 +1139,7 @@
   // continuously during drag, pinch, rotation or pitch.
   map.on('idle', () => schedulePoiRefresh(450));
 
+  renderStops();
   renderBranches();
 
   // Smart POI intentionally does NOT start automatically.

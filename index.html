@@ -10,11 +10,12 @@
   <title>CYBERMG — филиалы Владивостока</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=12" />
+  <link rel="stylesheet" href="styles.css?v=13" />
   <script src="config.js"></script>
   <script src="backup-key.js"></script>
   <script src="backup-key-2.js"></script>
-  <script src="branches.js?v=12"></script>
+  <script src="branches.js?v=13"></script>
+  <script src="stops.js?v=13"></script>
   <script src="https://mapgl.2gis.com/api/js/v1"></script>
 </head>
 <body>
@@ -63,6 +64,23 @@
 
   <div id="statusToast" class="toast hidden" role="status"></div>
 
+  <div class="map-legend" aria-label="Условные обозначения">
+    <div class="legend-row">
+      <span class="legend-branch-sample"></span>
+      <strong>CYBERMG</strong>
+    </div>
+    <div class="legend-row legend-stop-row">
+      <span class="legend-stop-sample">№</span>
+      <span>Остановка</span>
+      <span class="legend-month">Окт</span><span class="legend-status-dot free"></span>
+      <span class="legend-month">Дек</span><span class="legend-status-dot free"></span>
+    </div>
+    <div class="legend-row legend-status-row">
+      <span class="legend-status-dot free"></span><span>свободно</span>
+      <span class="legend-status-dot occupied"></span><span>занято</span>
+    </div>
+  </div>
+
   <section id="infoSheet" class="info-sheet hidden" aria-live="polite">
     <button id="closeSheetBtn" class="sheet-close" type="button" aria-label="Закрыть">×</button>
     <div class="sheet-handle"></div>
@@ -72,6 +90,18 @@
     </div>
     <h2 id="sheetTitle">Точка на карте</h2>
     <p id="sheetAddress" class="sheet-address"></p>
+    <div id="stopAvailability" class="stop-availability hidden">
+      <div class="availability-chip">
+        <span id="octoberStatusDot" class="availability-dot"></span>
+        <span class="availability-month">Октябрь</span>
+        <strong id="octoberStatusText">—</strong>
+      </div>
+      <div class="availability-chip">
+        <span id="decemberStatusDot" class="availability-dot"></span>
+        <span class="availability-month">Декабрь</span>
+        <strong id="decemberStatusText">—</strong>
+      </div>
+    </div>
     <div class="sheet-meta">
       <div>
         <span class="meta-label">Ближайший филиал</span>
@@ -98,6 +128,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>
