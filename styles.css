@@ -747,3 +747,100 @@ body.sheet-open .map-legend {
     gap: 6px;
   }
 }
+
+
+/* =========================
+   CYBERMG MAP — stage 3
+   Independent static/media advertising layers.
+   ========================= */
+
+.layer-action-icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1;
+  border: 1.5px solid currentColor;
+}
+
+.static-layer-action {
+  color: #111;
+  background: #fff;
+}
+
+.media-layer-action {
+  color: #fff;
+  background: #2F6BFF;
+  border-color: rgba(255,255,255,.9);
+}
+
+.layer-toggle-btn:not(.active) .layer-action-icon {
+  opacity: .46;
+  filter: grayscale(1);
+}
+
+.legend-media-sample {
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #111;
+  border-radius: 5px;
+  background: #2F6BFF;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 950;
+}
+
+.media-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.media-detail-item {
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #f4f6fb;
+}
+
+.media-detail-item strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.media-price-item {
+  background: #eef3ff;
+}
+
+.media-price-item strong {
+  color: #245edb;
+}
+
+@media (max-width: 760px) {
+  .quick-actions {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .quick-actions::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .media-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

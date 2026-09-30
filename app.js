@@ -5,6 +5,7 @@
   const cfg = window.APP_CONFIG || {};
   const branches = window.CYBERMG_BRANCHES || [];
   const stops = window.AD_STOPS || [];
+  const mediaStops = window.MEDIA_STOPS || [];
   const PRIMARY_KEY = cfg.DGIS_KEY_PRIMARY || cfg.DGIS_KEY || '';
   const BACKUP_KEY_1 = window.DGIS_BACKUP_KEY_1 || '';
   const BACKUP_KEY_2 = window.DGIS_BACKUP_KEY_2 || '';
@@ -84,6 +85,9 @@
 
   let branchMarkers = [];
   let stopMarkers = [];
+  let mediaStopMarkers = [];
+  let staticStopsVisible = true;
+  let mediaStopsVisible = true;
   let selectionMarker = null;
   let searchAbort = null;
   let searchTimer = null;
@@ -227,11 +231,12 @@
 
   function stopIconUrl(stop) {
     const id = String(stop.id).padStart(2, '0');
-    return `assets/stops/stop-${id}.svg?v=14`;
+    return `assets/stops/stop-${id}.svg?v=15`;
   }
 
   function renderStops() {
     destroyAll(stopMarkers);
+    if (!staticStopsVisible) return;
 
     if (!stops.length) {
       console.warn('Advertising stop data were not loaded. Check stops.js.');
@@ -281,6 +286,87 @@
     });
 
     console.info(`Stops: rendered ${stops.length} locations (${stopMarkers.length} native map objects).`);
+  }
+
+  function formatRub(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '—';
+    return `${number.toLocaleString('ru-RU')} ₽`;
+  }
+
+  function openMediaStop(stop) {
+    showInfo({
+      coords: stop.coordinates,
+      title: `Медиа №${stop.id} · ${stop.name}`,
+      address: stop.address,
+      type: 'media-stop',
+      mediaStop: stop
+    });
+  }
+
+  function mediaStopIconUrl(stop) {
+    const id = String(stop.id).padStart(2, '0');
+    return `assets/media-stops/media-${id}.svg?v=15`;
+  }
+
+  function renderMediaStops() {
+    destroyAll(mediaStopMarkers);
+    if (!mediaStopsVisible) return;
+
+    if (!mediaStops.length) {
+      console.warn('Media stop data were not loaded. Check media-stops.js.');
+      showToast('Не загрузились данные медиа-остановок', 6000);
+      return;
+    }
+
+    mediaStops.forEach((stop, index) => {
+      const zIndex = 180 + index;
+
+      try {
+        const marker = new mapgl.Marker(map, {
+          coordinates: stop.coordinates,
+          icon: mediaStopIconUrl(stop),
+          size: [40, 42],
+          anchor: [20, 21],
+          interactive: true,
+          zIndex,
+          userData: { kind: 'media-stop', stopId: stop.id }
+        });
+
+        marker.on('click', () => openMediaStop(stop));
+        mediaStopMarkers.push(marker);
+      } catch (error) {
+        console.error(`Failed to render media stop #${stop.id}:`, error);
+
+        try {
+          const fallback = new mapgl.CircleMarker(map, {
+            coordinates: stop.coordinates,
+            diameter: 15,
+            color: '#2F6BFF',
+            strokeColor: '#111111',
+            strokeWidth: 3,
+            interactive: true,
+            zIndex
+          });
+          fallback.on('click', () => openMediaStop(stop));
+          mediaStopMarkers.push(fallback);
+        } catch (fallbackError) {
+          console.error(`Fallback media marker failed for #${stop.id}:`, fallbackError);
+        }
+      }
+    });
+
+    console.info(`Media stops: rendered ${mediaStops.length} locations (${mediaStopMarkers.length} native map objects).`);
+  }
+
+  function syncLayerButtons() {
+    const staticBtn = $('toggleStaticStopsBtn');
+    const mediaBtn = $('toggleMediaStopsBtn');
+
+    staticBtn.classList.toggle('active', staticStopsVisible);
+    staticBtn.setAttribute('aria-pressed', String(staticStopsVisible));
+    mediaBtn.classList.toggle('active', mediaStopsVisible);
+    mediaBtn.setAttribute('aria-pressed', String(mediaStopsVisible));
   }
 
   function renderBranches() {
@@ -760,7 +846,8 @@
       street: 'Улица',
       route: 'Маршрут',
       station: 'Остановка',
-      'ad-stop': 'Рекламный остановочный павильон',
+      'ad-stop': 'Статичная реклама на остановке',
+      'media-stop': 'Медиаэкран на остановке',
     };
     return labels[type] || (type ? 'Объект 2ГИС' : 'Точка на карте');
   }
@@ -782,12 +869,16 @@
     return `https://2gis.ru/geo/${coords[0].toFixed(6)},${coords[1].toFixed(6)}`;
   }
 
-  function showInfo({ coords, title, address, type, id, branch = null, stop = null }) {
+  function showInfo({ coords, title, address, type, id, branch = null, stop = null, mediaStop = null }) {
     const nearest = branch ? { branch, distance: 0 } : nearestBranch(coords);
     const badge = $('branchBadge');
 
-    if (stop) {
-      badge.textContent = `ОСТАНОВКА №${stop.id}`;
+    if (mediaStop) {
+      badge.textContent = `МЕДИА №${mediaStop.id}`;
+      badge.style.background = '#2F6BFF';
+      badge.style.color = '#FFFFFF';
+    } else if (stop) {
+      badge.textContent = `СТАТИКА №${stop.id}`;
       badge.style.background = '#111111';
       badge.style.color = '#FFFFFF';
     } else {
@@ -799,6 +890,8 @@
     $('objectType').textContent = branch ? 'Филиал CYBERMG' : typeLabel(type);
 
     const stopAvailability = $('stopAvailability');
+    const mediaDetails = $('mediaDetails');
+
     if (stop) {
       const octOccupied = Boolean(stop.october?.occupied);
       const decOccupied = Boolean(stop.december?.occupied);
@@ -810,6 +903,21 @@
       stopAvailability.classList.remove('hidden');
     } else {
       stopAvailability.classList.add('hidden');
+    }
+
+    if (mediaStop) {
+      $('mediaSize').textContent = mediaStop.size || '—';
+      $('mediaHours').textContent = mediaStop.hours || '—';
+      $('mediaTiming').textContent =
+        `${mediaStop.chronoSec ?? '—'} сек ролик · ${mediaStop.blockSec ?? '—'} сек блок`;
+      $('mediaOutputs').textContent = mediaStop.outputsPerDay
+        ? `${mediaStop.outputsPerDay} / день`
+        : '—';
+      $('mediaPrice').textContent = formatRub(mediaStop.priceMonth);
+      $('mediaPriceVat').textContent = formatRub(mediaStop.priceVat);
+      mediaDetails.classList.remove('hidden');
+    } else {
+      mediaDetails.classList.add('hidden');
     }
     $('sheetTitle').textContent = title || 'Точка на карте';
     $('sheetAddress').textContent = address || 'Без адреса';
@@ -1017,6 +1125,32 @@
     hideInfo();
   });
 
+  $('toggleStaticStopsBtn').addEventListener('click', () => {
+    staticStopsVisible = !staticStopsVisible;
+    syncLayerButtons();
+
+    if (staticStopsVisible) {
+      renderStops();
+      showToast(`Статика: ${stops.length} остановок`);
+    } else {
+      destroyAll(stopMarkers);
+      showToast('Статика скрыта');
+    }
+  });
+
+  $('toggleMediaStopsBtn').addEventListener('click', () => {
+    mediaStopsVisible = !mediaStopsVisible;
+    syncLayerButtons();
+
+    if (mediaStopsVisible) {
+      renderMediaStops();
+      showToast(`Медиа: ${mediaStops.length} остановок`);
+    } else {
+      destroyAll(mediaStopMarkers);
+      showToast('Медиа скрыто');
+    }
+  });
+
   $('togglePoiBtn').addEventListener('click', () => {
     poiVisible = !poiVisible;
     $('togglePoiBtn').classList.toggle('active', poiVisible);
@@ -1114,7 +1248,9 @@
   // continuously during drag, pinch, rotation or pitch.
   map.on('idle', () => schedulePoiRefresh(450));
 
+  syncLayerButtons();
   renderStops();
+  renderMediaStops();
   renderBranches();
 
   // Smart POI intentionally does NOT start automatically.

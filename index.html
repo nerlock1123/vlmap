@@ -10,12 +10,13 @@
   <title>CYBERMG — филиалы Владивостока</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=13" />
+  <link rel="stylesheet" href="styles.css?v=15" />
   <script src="config.js"></script>
   <script src="backup-key.js"></script>
   <script src="backup-key-2.js"></script>
-  <script src="branches.js?v=14"></script>
-  <script src="stops.js?v=14"></script>
+  <script src="branches.js?v=15"></script>
+  <script src="stops.js?v=15"></script>
+  <script src="media-stops.js?v=15"></script>
   <script src="https://mapgl.2gis.com/api/js/v1"></script>
 </head>
 <body>
@@ -49,6 +50,14 @@
       <button id="homeBtn" class="action-btn" type="button" title="Показать все филиалы CYBERMG">
         <span class="action-icon">⌂</span><span class="action-text">Все филиалы</span>
       </button>
+      <button id="toggleStaticStopsBtn" class="action-btn active layer-toggle-btn" type="button"
+              aria-pressed="true" title="Показать или скрыть остановки со статичной рекламой">
+        <span class="layer-action-icon static-layer-action">S</span><span class="action-text">Статика</span>
+      </button>
+      <button id="toggleMediaStopsBtn" class="action-btn active layer-toggle-btn" type="button"
+              aria-pressed="true" title="Показать или скрыть остановки с медиаэкранами">
+        <span class="layer-action-icon media-layer-action">M</span><span class="action-text">Медиа</span>
+      </button>
       <button id="togglePoiBtn" class="action-btn" type="button" title="Показать или скрыть организации">
         <span class="action-icon">●</span><span class="action-text">Места</span>
       </button>
@@ -71,9 +80,13 @@
     </div>
     <div class="legend-row legend-stop-row">
       <span class="legend-stop-sample">№</span>
-      <span>Остановка · 21 точка</span>
+      <span><strong>Статика</strong> · 21</span>
       <span class="legend-month">Окт</span><span class="legend-status-dot free"></span>
       <span class="legend-month">Дек</span><span class="legend-status-dot free"></span>
+    </div>
+    <div class="legend-row">
+      <span class="legend-media-sample">M</span>
+      <span><strong>Медиа</strong> · 30</span>
     </div>
     <div class="legend-row legend-status-row">
       <span class="legend-status-dot free"></span><span>свободно</span>
@@ -102,6 +115,32 @@
         <strong id="decemberStatusText">—</strong>
       </div>
     </div>
+    <div id="mediaDetails" class="media-details hidden">
+      <div class="media-detail-item">
+        <span class="meta-label">Размер экрана</span>
+        <strong id="mediaSize">—</strong>
+      </div>
+      <div class="media-detail-item">
+        <span class="meta-label">Время работы</span>
+        <strong id="mediaHours">—</strong>
+      </div>
+      <div class="media-detail-item">
+        <span class="meta-label">Ролик / блок</span>
+        <strong id="mediaTiming">—</strong>
+      </div>
+      <div class="media-detail-item">
+        <span class="meta-label">Выходов в день</span>
+        <strong id="mediaOutputs">—</strong>
+      </div>
+      <div class="media-detail-item media-price-item">
+        <span class="meta-label">Цена / месяц</span>
+        <strong id="mediaPrice">—</strong>
+      </div>
+      <div class="media-detail-item media-price-item">
+        <span class="meta-label">С НДС 5%</span>
+        <strong id="mediaPriceVat">—</strong>
+      </div>
+    </div>
     <div class="sheet-meta">
       <div>
         <span class="meta-label">Ближайший филиал</span>
@@ -128,6 +167,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>
