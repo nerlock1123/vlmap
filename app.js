@@ -118,34 +118,130 @@
     list.length = 0;
   }
 
-  function branchMarkerHtml(branch) {
-    const name = escapeHtml(branch.name);
-    const [labelX = 12, labelY = -16] = branch.labelOffset || [];
-    return `
-      <button class="cybermg-branch-marker" type="button" data-branch-id="${branch.id}" aria-label="CYBERMG ${name}" style="--label-x:${labelX}px;--label-y:${labelY}px">
-        <span class="cybermg-marker-dot" aria-hidden="true"><span>MG</span></span>
-        <span class="cybermg-marker-copy">
-          <strong>CYBERMG</strong>
-          <small>${name}</small>
-        </span>
-      </button>`;
+  function openBranch(branch) {
+    showInfo({
+      coords: branch.coordinates,
+      title: `CYBERMG ${branch.name}`,
+      address: branch.address,
+      type: 'branch',
+      branch
+    });
+  }
+
+  function addBranchLabel(branch, zIndex) {
+    if (typeof mapgl.Label !== 'function') return null;
+
+    const [offsetX = 18, offsetY = -12] = branch.labelOffset || [];
+    const relativeAnchor = offsetX < 0
+      ? [1, 0.5]
+      : offsetX > 0
+        ? [0, 0.5]
+        : [0.5, offsetY > 0 ? 0 : 1];
+
+    const baseOptions = {
+      coordinates: branch.coordinates,
+      text: `CYBERMG\n${branch.name}`,
+      color: '#111111',
+      fontSize: 13,
+      lineHeight: 1.05,
+      haloColor: '#FFC600',
+      haloRadius: 5,
+      offset: [offsetX, offsetY],
+      relativeAnchor,
+      interactive: true,
+      zIndex
+    };
+
+    let label;
+    try {
+      // Current MapGL: keep our six labels outside the collision engine.
+      label = new mapgl.Label(map, {
+        ...baseOptions,
+        labeling: { type: 'none' }
+      });
+    } catch (error) {
+      console.warn('MapGL Label labeling option is unavailable; using plain label:', error);
+      label = new mapgl.Label(map, baseOptions);
+    }
+
+    label.on('click', (event) => {
+      if (event?.originalEvent) {
+        event.originalEvent.preventDefault?.();
+        event.originalEvent.stopPropagation?.();
+      }
+      openBranch(branch);
+    });
+
+    return label;
+  }
+
+  function addBranchDot(branch, zIndex) {
+    let marker;
+
+    // Prefer the native WebGL circle. Unlike the previous 0x0 HTML marker,
+    // this does not depend on DOM sizing and is reliably rendered by MapGL.
+    if (typeof mapgl.CircleMarker === 'function') {
+      marker = new mapgl.CircleMarker(map, {
+        coordinates: branch.coordinates,
+        diameter: 30,
+        color: '#FFC600',
+        strokeColor: '#111111',
+        strokeWidth: 4,
+        interactive: true,
+        zIndex
+      });
+    } else {
+      // Very old MapGL fallback: a standard native marker is still preferable
+      // to hiding the branch completely.
+      marker = new mapgl.Marker(map, {
+        coordinates: branch.coordinates,
+        interactive: true,
+        zIndex
+      });
+    }
+
+    marker.on('click', () => openBranch(branch));
+    return marker;
   }
 
   function renderBranches() {
     destroyAll(branchMarkers);
 
-    branches.forEach((branch) => {
-      branchMarkers.push(new mapgl.HtmlMarker(map, {
-        coordinates: branch.coordinates,
-        html: branchMarkerHtml(branch),
-        interactive: true,
-        preventMapInteractions: true,
-        labeling: { type: 'none' },
-        zIndex: 220
-      }));
-    });
-  }
+    if (!branches.length) {
+      console.error('CYBERMG branches were not loaded. Check branches.js.');
+      showToast('Не загрузились данные 6 филиалов CYBERMG', 6000);
+      return;
+    }
 
+    branches.forEach((branch, index) => {
+      const zIndex = 220 + index * 2;
+
+      try {
+        const dot = addBranchDot(branch, zIndex);
+        if (dot) branchMarkers.push(dot);
+
+        const label = addBranchLabel(branch, zIndex + 1);
+        if (label) branchMarkers.push(label);
+      } catch (error) {
+        console.error(`Failed to render CYBERMG branch ${branch.name}:`, error);
+
+        // Last-resort native marker. One broken label must never remove a branch.
+        try {
+          const fallback = new mapgl.Marker(map, {
+            coordinates: branch.coordinates,
+            interactive: true,
+            zIndex: zIndex + 5
+          });
+          fallback.on('click', () => openBranch(branch));
+          branchMarkers.push(fallback);
+        } catch (fallbackError) {
+          console.error(`Fallback marker failed for ${branch.name}:`, fallbackError);
+        }
+      }
+    });
+
+    console.info(`CYBERMG: rendered ${branches.length} branches (${branchMarkers.length} map objects).`);
+  }
 
   function clearPoiMarkers() {
     destroyAll(poiMarkers);

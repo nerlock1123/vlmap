@@ -1,4 +1,4 @@
-const CACHE='cybermg-map-v11-branches';
+const CACHE='cybermg-map-v12-native-branches';
 const APP=[
   './',
   './index.html',
