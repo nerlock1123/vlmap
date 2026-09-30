@@ -225,41 +225,9 @@
     });
   }
 
-  function createStopMarkerElement(stop) {
-    const el = document.createElement('div');
-    el.className = 'ad-stop-marker';
-    el.dataset.stopId = String(stop.id);
-    el.setAttribute('role', 'button');
-    el.setAttribute('aria-label',
-      `Остановка №${stop.id}. Октябрь: ${stopAvailabilityLabel(stop.october)}. Декабрь: ${stopAvailabilityLabel(stop.december)}`
-    );
-    el.title = `№${stop.id} · ${stop.name}`;
-
-    const number = document.createElement('span');
-    number.className = 'ad-stop-number';
-    number.textContent = String(stop.id);
-
-    const statusRack = document.createElement('span');
-    statusRack.className = 'ad-stop-status-rack';
-
-    const octDot = document.createElement('span');
-    octDot.className = `ad-stop-status-dot ${stop.october?.occupied ? 'occupied' : 'free'}`;
-    octDot.title = `Октябрь: ${stopAvailabilityLabel(stop.october)}`;
-
-    const decDot = document.createElement('span');
-    decDot.className = `ad-stop-status-dot ${stop.december?.occupied ? 'occupied' : 'free'}`;
-    decDot.title = `Декабрь: ${stopAvailabilityLabel(stop.december)}`;
-
-    statusRack.append(octDot, decDot);
-    el.append(number, statusRack);
-
-    el.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openStop(stop);
-    });
-
-    return el;
+  function stopIconUrl(stop) {
+    const id = String(stop.id).padStart(2, '0');
+    return `assets/stops/stop-${id}.svg?v=14`;
   }
 
   function renderStops() {
@@ -267,35 +235,42 @@
 
     if (!stops.length) {
       console.warn('Advertising stop data were not loaded. Check stops.js.');
+      showToast('Не загрузились данные остановок', 6000);
       return;
     }
 
     stops.forEach((stop, index) => {
+      const zIndex = 150 + index;
+
       try {
-        const markerElement = createStopMarkerElement(stop);
-        const marker = new mapgl.HtmlMarker(map, {
+        // Stage 2.1: use a normal native MapGL Marker with a local SVG icon.
+        // This deliberately avoids HtmlMarker/DOM rendering, which proved
+        // unreliable in the deployed build.
+        const marker = new mapgl.Marker(map, {
           coordinates: stop.coordinates,
-          html: markerElement,
-          anchor: [12, 12],
+          icon: stopIconUrl(stop),
+          size: [38, 44],
+          anchor: [19, 22],
           interactive: true,
-          preventMapInteractions: true,
-          labeling: { type: 'none' },
-          zIndex: 140 + index
+          zIndex,
+          userData: { kind: 'ad-stop', stopId: stop.id }
         });
+
+        marker.on('click', () => openStop(stop));
         stopMarkers.push(marker);
       } catch (error) {
-        console.error(`Failed to render advertising stop #${stop.id}:`, error);
+        console.error(`Failed to render native advertising stop #${stop.id}:`, error);
 
-        // Native fallback: the stop remains visible even if HTML markers are unavailable.
+        // Extremely conservative fallback: a visible white dot.
         try {
           const fallback = new mapgl.CircleMarker(map, {
             coordinates: stop.coordinates,
-            diameter: 12,
-            color: '#FFFFFF',
+            diameter: 15,
+            color: stop.october?.occupied ? '#FF3B30' : '#FFFFFF',
             strokeColor: '#111111',
-            strokeWidth: 2,
+            strokeWidth: 3,
             interactive: true,
-            zIndex: 140 + index
+            zIndex
           });
           fallback.on('click', () => openStop(stop));
           stopMarkers.push(fallback);
@@ -305,7 +280,7 @@
       }
     });
 
-    console.info(`Stops: rendered ${stops.length} locations (${stopMarkers.length} map objects).`);
+    console.info(`Stops: rendered ${stops.length} locations (${stopMarkers.length} native map objects).`);
   }
 
   function renderBranches() {
