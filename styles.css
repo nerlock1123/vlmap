@@ -163,19 +163,6 @@ button { cursor:pointer; }
 }
 .legend-dot { width:9px; height:9px; border-radius:3px; }
 
-.sector-label {
-  transform:translate(-50%,-50%);
-  padding:4px 7px;
-  border-radius:999px;
-  background:rgba(255,255,255,.88);
-  border:2px solid currentColor;
-  box-shadow:0 3px 10px rgba(0,0,0,.13);
-  font-size:11px;
-  font-weight:900;
-  line-height:1;
-  white-space:nowrap;
-  pointer-events:none;
-}
 
 .info-sheet {
   position:fixed;
@@ -219,7 +206,7 @@ button { cursor:pointer; }
   gap:8px;
   padding-right:34px;
 }
-.sector-badge {
+.branch-badge {
   padding:5px 9px;
   border-radius:999px;
   color:#fff;
@@ -417,7 +404,6 @@ button { cursor:pointer; }
   }
 
   .legend-pill,
-  .sector-label,
   .twogis-btn,
   .toast {
     box-shadow: none !important;
@@ -428,8 +414,7 @@ button { cursor:pointer; }
     without disabling MapGL's own touch gestures.
   */
   .quick-actions,
-  .legend,
-  .sector-label {
+  .legend {
     -webkit-user-select: none;
     user-select: none;
   }
@@ -560,4 +545,126 @@ button { cursor:pointer; }
     transform: scale(1.15);
     opacity: .35;
   }
+}
+
+
+/* =========================
+   CYBERMG BRANCHES — stage 1
+   Six branch markers stay visible at every map zoom.
+   ========================= */
+
+.cybermg-branch-marker {
+  position: relative;
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #111;
+  font: inherit;
+  cursor: pointer;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.cybermg-marker-dot {
+  position: absolute;
+  left: -18px;
+  top: -18px;
+  width: 36px;
+  height: 36px;
+  border: 3px solid #111;
+  border-radius: 11px;
+  background: #FFC600;
+  box-shadow: 0 5px 16px rgba(0,0,0,.24);
+  display: grid;
+  place-items: center;
+  z-index: 2;
+}
+
+.cybermg-marker-dot::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 9px;
+  height: 9px;
+  border-right: 3px solid #111;
+  border-bottom: 3px solid #111;
+  background: #FFC600;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.cybermg-marker-dot span {
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -.02em;
+}
+
+.cybermg-marker-copy {
+  position: absolute;
+  left: var(--label-x, 12px);
+  top: var(--label-y, -16px);
+  width: 106px;
+  padding: 7px 9px 6px;
+  border: 2px solid #111;
+  border-radius: 10px;
+  background: rgba(255,198,0,.97);
+  box-shadow: 0 5px 16px rgba(0,0,0,.20);
+  text-align: left;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.cybermg-marker-copy strong,
+.cybermg-marker-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cybermg-marker-copy strong {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: .055em;
+}
+
+.cybermg-marker-copy small {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.05;
+  font-weight: 900;
+}
+
+.cybermg-branch-marker:hover .cybermg-marker-dot,
+.cybermg-branch-marker:hover .cybermg-marker-copy,
+.cybermg-branch-marker:focus-visible .cybermg-marker-dot,
+.cybermg-branch-marker:focus-visible .cybermg-marker-copy {
+  background: #fff;
+}
+
+.cybermg-branch-marker:focus-visible {
+  outline: none;
+}
+
+@media (max-width: 760px) {
+  .cybermg-marker-dot {
+    left: -16px;
+    top: -16px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  .cybermg-marker-copy {
+    width: 96px;
+    padding: 6px 8px 5px;
+  }
+
+  .cybermg-marker-copy strong { font-size: 9px; }
+  .cybermg-marker-copy small { font-size: 10px; }
 }

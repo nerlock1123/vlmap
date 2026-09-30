@@ -3,7 +3,7 @@
   'use strict';
 
   const cfg = window.APP_CONFIG || {};
-  const sectors = window.SECTORS || [];
+  const branches = window.CYBERMG_BRANCHES || [];
   const PRIMARY_KEY = cfg.DGIS_KEY_PRIMARY || cfg.DGIS_KEY || '';
   const BACKUP_KEY_1 = window.DGIS_BACKUP_KEY_1 || '';
   const BACKUP_KEY_2 = window.DGIS_BACKUP_KEY_2 || '';
@@ -81,9 +81,7 @@
     }
   }
 
-  let sectorObjects = [];
-  let sectorLabels = [];
-  let sectorsVisible = true;
+  let branchMarkers = [];
   let selectionMarker = null;
   let searchAbort = null;
   let searchTimer = null;
@@ -113,17 +111,6 @@
   const POI_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
   const CITY_ID_CACHE_KEY = 'mapdozor-vladivostok-city-id-v8';
 
-  function polygonRing(points) {
-    return [[...points, points[0]]];
-  }
-
-  function sectorCenter(points) {
-    return [
-      points.reduce((sum, p) => sum + p[0], 0) / points.length,
-      points.reduce((sum, p) => sum + p[1], 0) / points.length,
-    ];
-  }
-
   function destroyAll(list) {
     list.forEach((obj) => {
       try { obj.destroy(); } catch (_) {}
@@ -131,37 +118,30 @@
     list.length = 0;
   }
 
-  function renderLegend() {
-    $('legend').innerHTML = sectors.map((s) => `
-      <div class="legend-pill">
-        <span class="legend-dot" style="background:${s.color}"></span>
-        ${s.name}
-      </div>
-    `).join('');
+  function branchMarkerHtml(branch) {
+    const name = escapeHtml(branch.name);
+    const [labelX = 12, labelY = -16] = branch.labelOffset || [];
+    return `
+      <button class="cybermg-branch-marker" type="button" data-branch-id="${branch.id}" aria-label="CYBERMG ${name}" style="--label-x:${labelX}px;--label-y:${labelY}px">
+        <span class="cybermg-marker-dot" aria-hidden="true"><span>MG</span></span>
+        <span class="cybermg-marker-copy">
+          <strong>CYBERMG</strong>
+          <small>${name}</small>
+        </span>
+      </button>`;
   }
 
-  function renderSectors() {
-    destroyAll(sectorObjects);
-    destroyAll(sectorLabels);
-    if (!sectorsVisible) return;
+  function renderBranches() {
+    destroyAll(branchMarkers);
 
-    sectors.forEach((sector) => {
-      sectorObjects.push(new mapgl.Polygon(map, {
-        coordinates: polygonRing(sector.points),
-        color: sector.color + '16',
-        strokeColor: sector.color,
-        strokeWidth: 4,
-        interactive: false,
-        zIndex: 20
-      }));
-
-      sectorLabels.push(new mapgl.HtmlMarker(map, {
-        coordinates: sectorCenter(sector.points),
-        html: `<div class="sector-label" style="color:${sector.color}">${sector.name}</div>`,
-        interactive: false,
-        preventMapInteractions: false,
-        maxZoom: 14,
-        zIndex: 21
+    branches.forEach((branch) => {
+      branchMarkers.push(new mapgl.HtmlMarker(map, {
+        coordinates: branch.coordinates,
+        html: branchMarkerHtml(branch),
+        interactive: true,
+        preventMapInteractions: true,
+        labeling: { type: 'none' },
+        zIndex: 220
       }));
     });
   }
@@ -387,35 +367,32 @@
   }
 
   // Boundary-aware point-on-segment check.
-  function pointOnSegment(p, a, b, eps = 1e-9) {
-    const cross = (p[1] - a[1]) * (b[0] - a[0]) - (p[0] - a[0]) * (b[1] - a[1]);
-    if (Math.abs(cross) > eps) return false;
-    const dot = (p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1]);
-    if (dot < -eps) return false;
-    const lenSq = (b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2;
-    return dot <= lenSq + eps;
+  function distanceKm(a, b) {
+    const toRad = (value) => value * Math.PI / 180;
+    const lat1 = toRad(a[1]);
+    const lat2 = toRad(b[1]);
+    const dLat = lat2 - lat1;
+    const dLon = toRad(b[0] - a[0]);
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
   }
 
-  function pointInPolygon(point, polygon) {
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      if (pointOnSegment(point, polygon[j], polygon[i], 1e-8)) return true;
-    }
+  function nearestBranch(coords) {
+    if (!branches.length) return null;
 
-    const x = point[0], y = point[1];
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i][0], yi = polygon[i][1];
-      const xj = polygon[j][0], yj = polygon[j][1];
-      const intersects =
-        ((yi > y) !== (yj > y)) &&
-        (x < ((xj - xi) * (y - yi)) / ((yj - yi) || Number.EPSILON) + xi);
-      if (intersects) inside = !inside;
-    }
-    return inside;
+    return branches.reduce((best, branch) => {
+      const distance = distanceKm(coords, branch.coordinates);
+      if (!best || distance < best.distance) return { branch, distance };
+      return best;
+    }, null);
   }
 
-  function findSector(coords) {
-    return sectors.find((sector) => pointInPolygon(coords, sector.points)) || null;
+  function formatDistance(distance) {
+    if (!Number.isFinite(distance)) return '';
+    if (distance < 1) return `${Math.max(10, Math.round(distance * 1000 / 10) * 10)} м`;
+    return `${distance.toFixed(distance < 10 ? 1 : 0)} км`;
   }
 
 
@@ -455,13 +432,13 @@
 
   function updateLiveStatus(position) {
     const coords = [position.coords.longitude, position.coords.latitude];
-    const sector = findSector(coords);
+    const nearest = nearestBranch(coords);
     const accuracy = Math.max(1, Math.round(position.coords.accuracy || 0));
     const speed = formatLiveSpeed(position.coords.speed);
 
-    $('liveSectorText').textContent = sector
-      ? `Сектор ${sector.name}`
-      : 'Вне секторов';
+    $('liveBranchText').textContent = nearest
+      ? `${nearest.branch.name} · ${formatDistance(nearest.distance)}`
+      : 'GPS';
 
     $('liveAccuracyText').textContent = `±${accuracy} м`;
     $('liveSpeedText').textContent = speed ? `• ${speed}` : '';
@@ -551,9 +528,10 @@
           followLocation = true;
           $('followBtn').classList.add('active');
           followCameraIfNeeded(lastLiveCoords, true);
-          showToast(findSector(lastLiveCoords)
-            ? 'GPS включён — сектор определяется в реальном времени'
-            : 'GPS включён — вы вне заданных секторов');
+          const nearest = nearestBranch(lastLiveCoords);
+          showToast(nearest
+            ? `GPS включён · ближе всего ${nearest.branch.name}`
+            : 'GPS включён');
         }
       },
       handleLiveLocationError,
@@ -628,18 +606,20 @@
     return `https://2gis.ru/geo/${coords[0].toFixed(6)},${coords[1].toFixed(6)}`;
   }
 
-  function showInfo({ coords, title, address, type, id }) {
-    const sector = findSector(coords);
-    const badge = $('sectorBadge');
-    const sectorText = sector ? `Сектор ${sector.name}` : 'Вне секторов';
+  function showInfo({ coords, title, address, type, id, branch = null }) {
+    const nearest = branch ? { branch, distance: 0 } : nearestBranch(coords);
+    const badge = $('branchBadge');
 
-    badge.textContent = sectorText;
-    badge.style.background = sector?.color || '#333';
+    badge.textContent = branch ? `CYBERMG · ${branch.name}` : 'CYBERMG';
+    badge.style.background = '#FFC600';
+    badge.style.color = '#111';
 
-    $('objectType').textContent = typeLabel(type);
+    $('objectType').textContent = branch ? 'Филиал CYBERMG' : typeLabel(type);
     $('sheetTitle').textContent = title || 'Точка на карте';
     $('sheetAddress').textContent = address || 'Без адреса';
-    $('sheetSector').textContent = sectorText;
+    $('sheetBranch').textContent = nearest
+      ? `${nearest.branch.name}${branch ? '' : ` · ${formatDistance(nearest.distance)}`}`
+      : '—';
     $('sheetCoords').textContent = `${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}`;
     $('open2gisBtn').href = build2GisUrl({ id, type, coords });
 
@@ -811,6 +791,23 @@
   });
 
   document.addEventListener('click', (e) => {
+    const marker = e.target.closest('[data-branch-id]');
+    if (marker) {
+      const branch = branches.find((item) => item.id === marker.dataset.branchId);
+      if (branch) {
+        e.preventDefault();
+        e.stopPropagation();
+        showInfo({
+          coords: branch.coordinates,
+          title: `CYBERMG ${branch.name}`,
+          address: branch.address,
+          type: 'branch',
+          branch
+        });
+      }
+      return;
+    }
+
     if (!e.target.closest('.search-shell')) {
       $('searchResults').classList.add('hidden');
     }
@@ -822,13 +819,6 @@
     map.setCenter(CITY_CENTER);
     map.setZoom(CITY_ZOOM);
     hideInfo();
-  });
-
-  $('toggleSectorsBtn').addEventListener('click', () => {
-    sectorsVisible = !sectorsVisible;
-    $('toggleSectorsBtn').classList.toggle('active', sectorsVisible);
-    $('legend').classList.toggle('hidden', !sectorsVisible);
-    renderSectors();
   });
 
   $('togglePoiBtn').addEventListener('click', () => {
@@ -888,7 +878,7 @@
       return;
     }
 
-    // Immediately show sector, then enrich card with 2GIS object details.
+    // Immediately show the selected point, then enrich the card with 2GIS object details.
     showInfo({
       coords,
       title: 'Загружаю объект…',
@@ -917,7 +907,7 @@
       showInfo({
         coords,
         title: 'Объект на карте',
-        address: 'Сектор определён по точке нажатия',
+        address: 'Не удалось загрузить подробности объекта 2ГИС',
         type: event.targetData?.type,
         id: targetId
       });
@@ -928,8 +918,7 @@
   // continuously during drag, pinch, rotation or pitch.
   map.on('idle', () => schedulePoiRefresh(450));
 
-  renderLegend();
-  renderSectors();
+  renderBranches();
 
   // Smart POI intentionally does NOT start automatically.
   // The first Markers API request happens only after the user taps “Места”.

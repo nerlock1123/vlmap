@@ -6,15 +6,15 @@
   <meta name="theme-color" content="#111111" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Сектора VL" />
-  <title>Владивосток — сектора</title>
+  <meta name="apple-mobile-web-app-title" content="CYBERMG Map" />
+  <title>CYBERMG — филиалы Владивостока</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="stylesheet" href="styles.css" />
   <script src="config.js"></script>
   <script src="backup-key.js"></script>
   <script src="backup-key-2.js"></script>
-  <script src="sectors.js"></script>
+  <script src="branches.js"></script>
   <script src="https://mapgl.2gis.com/api/js/v1"></script>
 </head>
 <body>
@@ -45,11 +45,8 @@
       <button id="followBtn" class="action-btn" type="button" title="Следовать за моим местоположением" disabled>
         <span class="action-icon">➤</span><span class="action-text">Следовать</span>
       </button>
-      <button id="homeBtn" class="action-btn" type="button" title="Показать весь город">
-        <span class="action-icon">⌂</span><span class="action-text">Весь город</span>
-      </button>
-      <button id="toggleSectorsBtn" class="action-btn active" type="button" title="Показать или скрыть сектора">
-        <span class="action-icon">▦</span><span class="action-text">Сектора</span>
+      <button id="homeBtn" class="action-btn" type="button" title="Показать все филиалы CYBERMG">
+        <span class="action-icon">⌂</span><span class="action-text">Все филиалы</span>
       </button>
       <button id="togglePoiBtn" class="action-btn" type="button" title="Показать или скрыть организации">
         <span class="action-icon">●</span><span class="action-text">Места</span>
@@ -59,12 +56,10 @@
 
   <div id="liveLocationStatus" class="live-status hidden" aria-live="polite">
     <span class="live-status-dot"></span>
-    <strong id="liveSectorText">GPS</strong>
+    <strong id="liveBranchText">GPS</strong>
     <span id="liveAccuracyText"></span>
     <span id="liveSpeedText"></span>
   </div>
-
-  <div id="legend" class="legend"></div>
 
   <div id="statusToast" class="toast hidden" role="status"></div>
 
@@ -72,15 +67,15 @@
     <button id="closeSheetBtn" class="sheet-close" type="button" aria-label="Закрыть">×</button>
     <div class="sheet-handle"></div>
     <div class="sheet-topline">
-      <span id="sectorBadge" class="sector-badge">—</span>
+      <span id="branchBadge" class="branch-badge">CYBERMG</span>
       <span id="objectType" class="object-type"></span>
     </div>
     <h2 id="sheetTitle">Точка на карте</h2>
     <p id="sheetAddress" class="sheet-address"></p>
     <div class="sheet-meta">
       <div>
-        <span class="meta-label">Сектор</span>
-        <strong id="sheetSector">—</strong>
+        <span class="meta-label">Ближайший филиал</span>
+        <strong id="sheetBranch">—</strong>
       </div>
       <div>
         <span class="meta-label">Координаты</span>

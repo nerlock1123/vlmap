@@ -1,4 +1,4 @@
-const CACHE='vl-sectors-v10-live-location';
+const CACHE='cybermg-map-v11-branches';
 const APP=[
   './',
   './index.html',
@@ -7,7 +7,7 @@ const APP=[
   './config.js',
   './backup-key.js',
   './backup-key-2.js',
-  './sectors.js',
+  './branches.js',
   './manifest.webmanifest'
 ];
 
